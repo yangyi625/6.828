@@ -46,10 +46,40 @@
 /*
  * Lab 3: Your code here for generating entry points for the different traps.
  */
-
+TRAPHANDLER_NOEC( ENTRY_DIVIDE, T_DIVIDE) 	/* divide error */
+TRAPHANDLER_NOEC( ENTRY_DEBUG, T_DEBUG)  	/* debug exception */
+TRAPHANDLER_NOEC( ENTRY_NMI, T_NMI)  		/* non-maskable interrupt */
+TRAPHANDLER_NOEC( ENTRY_BRKPT, T_BRKPT)  	/* breakpoint */
+TRAPHANDLER_NOEC( ENTRY_OFLOW, T_OFLOW)  	/* overflow */
+TRAPHANDLER_NOEC( ENTRY_BOUND, T_BOUND)  	/* bounds check */
+TRAPHANDLER_NOEC( ENTRY_ILLOP, T_ILLOP)  	/* illegal opcode */
+TRAPHANDLER_NOEC( ENTRY_DEVICE, T_DEVICE)  	/* device not available */
+TRAPHANDLER     ( ENTRY_DBLFLT, T_DBLFLT)  	/* double fault */
+/* T_COPROC */  							/* reserved */
+TRAPHANDLER     ( ENTRY_TSS, T_TSS)  		/* invalid task switch segment */
+TRAPHANDLER     ( ENTRY_SEGNP, T_SEGNP)  	/* segment not present */
+TRAPHANDLER     ( ENTRY_STACK, T_STACK)  	/* stack exception */
+TRAPHANDLER     ( ENTRY_GPFLT, T_GPFLT)  	/* general protection fault */
+TRAPHANDLER     ( ENTRY_PGFLT, T_PGFLT)  	/* page fault */
+/* T_RES */  								/* reserved */
+TRAPHANDLER_NOEC( ENTRY_FPERR, T_FPERR)  	/* floating point error */
+TRAPHANDLER_NOEC( ENTRY_ALIGN, T_ALIGN)  	/* aligment check */
+TRAPHANDLER_NOEC( ENTRY_MCHK, T_MCHK)  		/* machine check */
+TRAPHANDLER_NOEC( ENTRY_SIMDERR, T_SIMDERR) /* SIMD floating point error */
 
 
 /*
  * Lab 3: Your code here for _alltraps
  */
-
+_alltraps:
+	pushw $0
+  	pushw %ds
+  	pushw $0
+  	pushw %es
+	/* %eax->%ecx->%edx->%ebx->%esp->%ebp->%esi->%edi */
+  	pushal
+  	movw $GD_KD,%eax
+	movw %eax,%ds
+	movw %eax,%es
+  	pushl %esp
+  	call trap
