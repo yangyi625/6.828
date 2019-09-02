@@ -7,7 +7,7 @@
 
 .set PROT_MODE_CSEG, 0x8         # kernel code segment selector
 .set PROT_MODE_DSEG, 0x10        # kernel data segment selector
-.set CR0_PE_ON,      0x1         # protected mode enable flag
+.set CR0_PE_ON,      0x1         # protected mode enable flag 設置保護模式flag
 
 .globl start
 start:
