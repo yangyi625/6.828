@@ -171,7 +171,6 @@ static void
 trap_dispatch(struct Trapframe *tf)
 {
 	// Handle processor exceptions.
-<<<<<<< HEAD
 	// LAB 3: Your code here.
 
 	// Handle spurious interrupts
@@ -187,8 +186,6 @@ trap_dispatch(struct Trapframe *tf)
 	// interrupt using lapic_eoi() before calling the scheduler!
 	// LAB 4: Your code here.
 
-=======
->>>>>>> lab3
 	// Unexpected trap: The user process or the kernel has a bug.
 	print_trapframe(tf);
 	if (tf->tf_cs == GD_KT)
@@ -241,14 +238,7 @@ void trap(struct Trapframe *tf)
 	// the interrupt path.
 	assert(!(read_eflags() & FL_IF));
 
-<<<<<<< HEAD
 	if ((tf->tf_cs & 3) == 3) {
-=======
-	cprintf("Incoming TRAP frame at %p\n", tf);
-
-	if ((tf->tf_cs & 3) == 3)
-	{
->>>>>>> lab3
 		// Trapped from user mode.
 		// Acquire the big kernel lock before doing any
 		// serious kernel work.
