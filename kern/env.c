@@ -15,10 +15,9 @@
 #include <kern/cpu.h>
 #include <kern/spinlock.h>
 
-struct Env *envs = NULL;		  // All environments
-struct Env *curenv = NULL;		  // The current env
-static struct Env *env_free_list; // Free environment list
-								  // (linked by Env->env_link)
+struct Env *envs = NULL;		// All environments
+static struct Env *env_free_list;	// Free environment list
+					// (linked by Env->env_link)
 
 #define ENVGENSHIFT 12 // >= LOGNENV
 
@@ -42,25 +41,28 @@ struct Segdesc gdt[NCPU + 5] =
 	// 0x0 - unused (always faults -- for trapping NULL far pointers)
 	SEG_NULL,
 
-		// 0x8 - kernel code segment
-		[GD_KT >> 3] = SEG(STA_X | STA_R, 0x0, 0xffffffff, 0),
+	// 0x8 - kernel code segment
+	[GD_KT >> 3] = SEG(STA_X | STA_R, 0x0, 0xffffffff, 0),
 
-		// 0x10 - kernel data segment
-		[GD_KD >> 3] = SEG(STA_W, 0x0, 0xffffffff, 0),
+	// 0x10 - kernel data segment
+	[GD_KD >> 3] = SEG(STA_W, 0x0, 0xffffffff, 0),
 
-		// 0x18 - user code segment
-		[GD_UT >> 3] = SEG(STA_X | STA_R, 0x0, 0xffffffff, 3),
+	// 0x18 - user code segment
+	[GD_UT >> 3] = SEG(STA_X | STA_R, 0x0, 0xffffffff, 3),
 
-		// 0x20 - user data segment
-		[GD_UD >> 3] = SEG(STA_W, 0x0, 0xffffffff, 3),
+	// 0x20 - user data segment
+	[GD_UD >> 3] = SEG(STA_W, 0x0, 0xffffffff, 3),
 
 	// Per-CPU TSS descriptors (starting from GD_TSS0) are initialized
 	// in trap_init_percpu()
 	[GD_TSS0 >> 3] = SEG_NULL
 };
 
-struct Pseudodesc gdt_pd = {
-	sizeof(gdt) - 1, (unsigned long)gdt};
+struct Pseudodesc gdt_pd = 
+{
+	sizeof(gdt) - 1, 
+	(unsigned long)gdt
+};
 
 //
 // Converts an envid to an env pointer.
@@ -338,9 +340,8 @@ region_alloc(struct Env *e, void *va, size_t len)
 static void
 load_icode(struct Env *e, uint8_t *binary)
 {
-	// Hints:
 	//  Load each program segment into virtual memory
-	//  at the address specified in the ELF section header.
+	//  at the address specified in the ELF segment header.
 	//  You should only load segments with ph->p_type == ELF_PROG_LOAD.
 	//  Each segment's virtual address can be found in ph->p_va
 	//  and its size in memory can be found in ph->p_memsz.
@@ -355,8 +356,6 @@ load_icode(struct Env *e, uint8_t *binary)
 	//  assume for this function that no two segments will touch
 	//  the same virtual page.
 	//
-	//  You may find a function like region_alloc useful.
-	//
 	//  Loading the segments is much simpler if you can move data
 	//  directly into the virtual addresses stored in the ELF binary.
 	//  So which page directory should be in force during
@@ -364,9 +363,7 @@ load_icode(struct Env *e, uint8_t *binary)
 	//
 	//  You must also do something with the program's entry point,
 	//  to make sure that the environment starts executing there.
-	//  What?  (See env_run() and env_pop_tf() below.)
 
-	// LAB 3: Your code here.
 	struct Elf *ELFENV = (struct Elf *)binary;
 	struct Proghdr *ph, *eph;
 	if (ELFENV->e_magic != ELF_MAGIC)
@@ -394,12 +391,12 @@ load_icode(struct Env *e, uint8_t *binary)
 
 	//  You must also do something with the program's entry point,
 	//  to make sure that the environment starts executing there.
-	//  What?  (See env_run() and env_pop_tf() below.)
 	e->env_tf.tf_eip = ELFENV->e_entry;
 
 	// Now map one page for the program's initial stack
 	// at virtual address USTACKTOP - PGSIZE.
 	region_alloc(e, (void *)(USTACKTOP - PGSIZE), PGSIZE);
+	e->env_tf.tf_esp = USTACKTOP;
 
 	// reload kern's pd
 	lcr3(PADDR(kern_pgdir));
@@ -534,7 +531,7 @@ void env_run(struct Env *e)
 {
 	// 	If this is a context switch (a new environment is running):
 	//	Set the current environment (if any) back to ENV_RUNNABLE
-	if (curenv == NULL && curenv != e)
+	if (curenv == NULL || curenv != e)
 	{
 		if (curenv != NULL && curenv->env_status == ENV_RUNNING)
 			curenv->env_status = ENV_RUNNABLE;
@@ -546,9 +543,8 @@ void env_run(struct Env *e)
 		// switch to its address space
 		lcr3(PADDR(e->env_pgdir));
 	}
+	unlock_kernel();
 	// eip has been set in load_icode
 	// restore the environment's registers
 	env_pop_tf(&e->env_tf);
-
-	panic("env_run not yet implemented");
 }

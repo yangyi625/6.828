@@ -93,30 +93,31 @@ void trap_init_percpu(void)
 	//     rather than the global "ts" variable;
 	//   - Use gdt[(GD_TSS0 >> 3) + i] for CPU i's TSS descriptor;
 	//   - You mapped the per-CPU kernel stacks in mem_init_mp()
-	//   - Initialize cpu_ts.ts_iomb to prevent unauthorized environments
-	//     from doing IO (0 is not the correct value!)
 	//
 	// ltr sets a 'busy' flag in the TSS selector, so if you
 	// accidentally load the same TSS on more than one CPU, you'll
 	// get a triple fault.  If you set up an individual CPU's TSS
 	// wrong, you may not get a fault until you try to return from
 	// user space on that CPU.
-	//
-	// LAB 4: Your code here:
-
+	
 	// Setup a TSS so that we get the right stack
 	// when we trap to the kernel.
-	ts.ts_esp0 = KSTACKTOP;
-	ts.ts_ss0 = GD_KD;
+	int i = cpunum();
+	uintptr_t GD_TSSi;
+	thiscpu->cpu_ts.ts_esp0 = KSTACKTOP - i * (KSTKSIZE + KSTKGAP);
+	thiscpu->cpu_ts.ts_ss0 = GD_KD;
+	thiscpu->cpu_ts.ts_iomb = sizeof(struct Taskstate);
 
 	// Initialize the TSS slot of the gdt.
-	gdt[GD_TSS0 >> 3] = SEG16(STS_T32A, (uint32_t)(&ts),
+	// the bottom three bits are special
+	GD_TSSi = GD_TSS0 + (i << 3);
+	gdt[GD_TSSi >> 3] = SEG16(STS_T32A, (uint32_t)(&(thiscpu->cpu_ts)),
 							  sizeof(struct Taskstate) - 1, 0);
-	gdt[GD_TSS0 >> 3].sd_s = 0;
+	gdt[GD_TSSi >> 3].sd_s = 0;
 
 	// Load the TSS selector (like other segment selectors, the
 	// bottom three bits are special; we leave them 0)
-	ltr(GD_TSS0);
+	ltr(GD_TSSi);
 
 	// Load the IDT
 	lidt(&idt_pd);
@@ -176,7 +177,8 @@ trap_dispatch(struct Trapframe *tf)
 	// Handle spurious interrupts
 	// The hardware sometimes raises these because of noise on the
 	// IRQ line or other reasons. We don't care.
-	if (tf->tf_trapno == IRQ_OFFSET + IRQ_SPURIOUS) {
+	if (tf->tf_trapno == IRQ_OFFSET + IRQ_SPURIOUS)
+	{
 		cprintf("Spurious interrupt on irq 7\n");
 		print_trapframe(tf);
 		return;
@@ -187,9 +189,7 @@ trap_dispatch(struct Trapframe *tf)
 	// LAB 4: Your code here.
 
 	// Unexpected trap: The user process or the kernel has a bug.
-	print_trapframe(tf);
-	if (tf->tf_cs == GD_KT)
-		panic("unhandled trap in kernel");
+	// print_trapframe(tf);
 	switch (tf->tf_trapno)
 	{
 	case T_DEBUG:
@@ -238,15 +238,17 @@ void trap(struct Trapframe *tf)
 	// the interrupt path.
 	assert(!(read_eflags() & FL_IF));
 
-	if ((tf->tf_cs & 3) == 3) {
+	if ((tf->tf_cs & 3) == 3)
+	{
 		// Trapped from user mode.
 		// Acquire the big kernel lock before doing any
 		// serious kernel work.
-		// LAB 4: Your code here.
+		lock_kernel();
 		assert(curenv);
 
 		// Garbage collect if current enviroment is a zombie
-		if (curenv->env_status == ENV_DYING) {
+		if (curenv->env_status == ENV_DYING)
+		{
 			env_free(curenv);
 			curenv = NULL;
 			sched_yield();
@@ -297,14 +299,13 @@ void page_fault_handler(struct Trapframe *tf)
 	// we branch to the page fault upcall recursively, pushing another
 	// page fault stack frame on top of the user exception stack.
 	//
-	// It is convenient for our code which returns from a page fault
-	// (lib/pfentry.S) to have one word of scratch space at the top of the
-	// trap-time stack; it allows us to more easily restore the eip/esp. In
-	// the non-recursive case, we don't have to worry about this because
-	// the top of the regular user stack is free.  In the recursive case,
-	// this means we have to leave an extra word between the current top of
-	// the exception stack and the new stack frame because the exception
-	// stack _is_ the trap-time stack.
+	// The trap handler needs one word of scratch space at the top of the
+	// trap-time stack in order to return.  In the non-recursive case, we
+	// don't have to worry about this because the top of the regular user
+	// stack is free.  In the recursive case, this means we have to leave
+	// an extra word between the current top of the exception stack and
+	// the new stack frame because the exception stack _is_ the trap-time
+	// stack.
 	//
 	// If there's no page fault upcall, the environment didn't allocate a
 	// page for its exception stack or can't write to it, or the exception

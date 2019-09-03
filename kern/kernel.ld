@@ -44,26 +44,18 @@ SECTIONS
 
 	/* The data segment */
 	.data : {
-		*(.data .data.*)
+		*(.data)
 	}
 
 	PROVIDE(edata = .);
 
 	.bss : {
-<<<<<<< HEAD
-		PROVIDE(edata = .);
-		*(.dynbss)
-		*(.bss .bss.*)
-		*(COMMON)
-		PROVIDE(end = .);
-=======
 		*(.bss)
->>>>>>> lab3
 	}
 
 	PROVIDE(end = .);
 
 	/DISCARD/ : {
-		*(.eh_frame .note.GNU-stack .comment .note)
+		*(.eh_frame .note.GNU-stack)
 	}
 }
